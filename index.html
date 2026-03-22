@@ -3,30 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Perspective Tool - Artist Pro</title>
+    <title>Artist Perspective Tool - Sun & Rotation</title>
     <style>
         body { margin: 0; overflow: hidden; background: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; background: white; cursor: crosshair; }
-        
         .ui { position: absolute; top: 20px; left: 20px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; width: 240px; }
         .panel { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: all; }
-        
         h1 { font-size: 16px; margin: 0 0 10px 0; color: #333; }
-        label { display: block; font-size: 12px; font-weight: bold; margin: 10px 0 5px; color: #666; }
+        label { display: block; font-size: 11px; font-weight: bold; margin: 8px 0 3px; color: #666; text-transform: uppercase; }
         input[type="range"] { width: 100%; cursor: pointer; }
-        
         button { width: 100%; padding: 10px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; margin-top: 8px; transition: 0.2s; }
-        
         #addBtn { background: #2ed573; color: white; }
-        #addBtn:hover { background: #26af5a; }
-        
-        #downloadBtn { background: #3498db; color: white; margin-top: 5px; }
-        #downloadBtn:hover { background: #2980b9; }
-        
+        #downloadBtn { background: #3498db; color: white; }
         #deleteBtn { background: #ff4757; color: white; opacity: 0.2; cursor: not-allowed; }
         #deleteBtn.active { opacity: 1; cursor: pointer; }
-        #deleteBtn.active:hover { background: #ff6b81; }
-
         .status { font-size: 11px; color: #888; text-align: center; margin-top: 5px; }
     </style>
 </head>
@@ -35,16 +25,19 @@
 <div class="ui">
     <div class="panel">
         <h1>Perspective Tool</h1>
-        <button id="addBtn">Add New Cottage</button>
-        <button id="downloadBtn">Download Image (PNG)</button>
+        <label>Sun Position</label>
+        <input type="range" id="sunSld" min="0" max="1000" value="500">
+        <button id="addBtn">Add Cottage</button>
+        <button id="downloadBtn">Download Image</button>
     </div>
     
     <div class="panel">
-        <p id="status" class="status">Click a green dot to edit</p>
-        <label>Cottage Size</label>
-        <input type="range" id="sizeSld" min="20" max="300" value="80">
-        <label>Wall Height</label>
-        <input type="range" id="heightSld" min="10" max="200" value="60">
+        <p id="status" class="status">Select a cottage</p>
+        <label>Size / Height</label>
+        <input type="range" id="sizeSld" min="20" max="250" value="80">
+        <input type="range" id="heightSld" min="10" max="150" value="60">
+        <label>Rotation</label>
+        <input type="range" id="rotSld" min="0" max="90" value="45">
         <button id="deleteBtn" disabled>Delete Selected</button>
     </div>
 </div>
@@ -52,22 +45,14 @@
 <canvas id="cvs"></canvas>
 
 <script>
-const canvas = document.getElementById('cvs');
-const ctx = canvas.getContext('2d');
-const sizeSld = document.getElementById('sizeSld');
-const heightSld = document.getElementById('heightSld');
-const addBtn = document.getElementById('addBtn');
-const deleteBtn = document.getElementById('deleteBtn');
-const downloadBtn = document.getElementById('downloadBtn');
-const statusText = document.getElementById('status');
+const canvas = document.getElementById('cvs'), ctx = canvas.getContext('2d');
+const sizeSld = document.getElementById('sizeSld'), heightSld = document.getElementById('heightSld');
+const rotSld = document.getElementById('rotSld'), sunSld = document.getElementById('sunSld');
+const addBtn = document.getElementById('addBtn'), deleteBtn = document.getElementById('deleteBtn');
+const downloadBtn = document.getElementById('downloadBtn'), statusText = document.getElementById('status');
 
 let width, height, activeObj = null, selectedHouse = null;
-
-const state = {
-    vpL: { x: 150, y: 350, isVP: true },
-    vpR: { x: 1000, y: 350, isVP: true },
-    houses: []
-};
+const state = { vpL: { x: 150, y: 350, isVP: true }, vpR: { x: 1000, y: 350, isVP: true }, houses: [] };
 
 function init() {
     window.addEventListener('resize', resize);
@@ -75,56 +60,38 @@ function init() {
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', () => activeObj = null);
     
-    // Add Cottage
     addBtn.onclick = () => {
-        const h = { x: width/2, y: height/2 + 50, size: 80, h: 60 };
-        state.houses.push(h);
-        select(h);
-        draw();
+        const h = { x: width/2, y: height/2 + 50, size: 80, h: 60, rot: 45 };
+        state.houses.push(h); select(h); draw();
     };
 
-    // Delete Cottage
-    deleteBtn.onclick = () => {
+    deleteBtn.onclick = () => { if(selectedHouse) { state.houses = state.houses.filter(h => h !== selectedHouse); select(null); draw(); } };
+    
+    downloadBtn.onclick = () => { draw(true); const link = document.createElement('a'); link.download = 'sketch.png'; link.href = canvas.toDataURL(); link.click(); draw(false); };
+
+    [sizeSld, heightSld, rotSld, sunSld].forEach(s => s.oninput = () => {
         if(selectedHouse) {
-            state.houses = state.houses.filter(h => h !== selectedHouse);
-            select(null);
-            draw();
+            selectedHouse.size = parseInt(sizeSld.value);
+            selectedHouse.h = parseInt(heightSld.value);
+            selectedHouse.rot = parseInt(rotSld.value);
         }
-    };
-
-    // Download Image
-    downloadBtn.onclick = () => {
-        // Redraw without helper dots for a clean image
-        draw(true); 
-        const link = document.createElement('a');
-        link.download = 'perspective-sketch.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-        draw(false); // Draw dots back
-    };
-
-    sizeSld.oninput = () => { if(selectedHouse) selectedHouse.size = parseInt(sizeSld.value); draw(); };
-    heightSld.oninput = () => { if(selectedHouse) selectedHouse.h = parseInt(heightSld.value); draw(); };
+        draw();
+    });
 
     resize();
-    // Start with 2 cottages
-    state.houses.push({ x: width * 0.35, y: height * 0.65, size: 90, h: 70 });
-    state.houses.push({ x: width * 0.65, y: height * 0.6, size: 70, h: 55 });
+    state.houses.push({ x: width * 0.4, y: height * 0.7, size: 90, h: 70, rot: 30 });
     draw();
 }
 
 function select(h) {
     selectedHouse = h;
     if(h) {
-        sizeSld.value = h.size;
-        heightSld.value = h.h;
-        deleteBtn.disabled = false;
-        deleteBtn.classList.add('active');
-        statusText.innerText = "Editing selected cottage";
+        sizeSld.value = h.size; heightSld.value = h.h; rotSld.value = h.rot;
+        deleteBtn.disabled = false; deleteBtn.classList.add('active');
+        statusText.innerText = "Cottage Selected";
     } else {
-        deleteBtn.disabled = true;
-        deleteBtn.classList.remove('active');
-        statusText.innerText = "Click a green dot to edit";
+        deleteBtn.disabled = true; deleteBtn.classList.remove('active');
+        statusText.innerText = "Select a cottage";
     }
 }
 
@@ -132,54 +99,57 @@ function resize() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
     state.vpR.x = width - 150;
+    sunSld.max = width;
     draw();
 }
 
+function getP(p, vp, tx) { return { x: tx, y: p.y + (vp.y - p.y) / (vp.x - p.x) * (tx - p.x) }; }
+
 function draw(clean = false) {
     ctx.clearRect(0, 0, width, height);
-    
-    // Horizon line
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "#bbb";
-    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = "#ccc";
     ctx.beginPath(); ctx.moveTo(0, state.vpL.y); ctx.lineTo(width, state.vpR.y); ctx.stroke();
-    ctx.setLineDash([]);
+
+    const sunX = parseInt(sunSld.value);
+    if(!clean) { ctx.fillStyle = "#FFD700"; ctx.beginPath(); ctx.arc(sunX, state.vpL.y - 10, 15, 0, 7); ctx.fill(); }
 
     state.houses.forEach(h => {
         const isSel = (h === selectedHouse && !clean);
-        const bMid = { x: h.x, y: h.y };
-        const tMid = { x: h.x, y: h.y - h.h };
+        const bMid = { x: h.x, y: h.y }, tMid = { x: h.x, y: h.y - h.h };
+        
+        // Calculate dynamic depth based on rotation
+        const rRad = (h.rot * Math.PI) / 180;
+        const wDist = h.size * Math.cos(rRad);
+        const dDist = h.size * Math.sin(rRad);
 
-        // Perspective Math
-        const getP = (p, vp, tx) => ({ x: tx, y: p.y + (vp.y - p.y) / (vp.x - p.x) * (tx - p.x) });
+        const bL = getP(bMid, state.vpL, h.x - wDist), tL = getP(tMid, state.vpL, h.x - wDist);
+        const bR = getP(bMid, state.vpR, h.x + dDist), tR = getP(tMid, state.vpR, h.x + dDist);
 
-        const bL = getP(bMid, state.vpL, h.x - h.size);
-        const tL = getP(tMid, state.vpL, h.x - h.size);
-        const bR = getP(bMid, state.vpR, h.x + h.size);
-        const tR = getP(tMid, state.vpR, h.x + h.size);
+        // Simple Lighting Logic
+        const leftLight = Math.max(0.2, Math.min(0.9, (sunX - (h.x - wDist)) / 400));
+        const rightLight = Math.max(0.2, Math.min(0.9, ((h.x + dDist) - sunX) / 400));
 
+        // Draw Walls with Shading
         ctx.lineWidth = isSel ? 3 : 1.5;
         
-        // Left Side (Red)
-        ctx.strokeStyle = "#ff4757";
-        ctx.beginPath(); ctx.moveTo(bMid.x, bMid.y); ctx.lineTo(bL.x, bL.y); ctx.lineTo(tL.x, tL.y); ctx.lineTo(tMid.x, tMid.y); ctx.stroke();
-        
-        // Right Side (Green)
-        ctx.strokeStyle = "#2ed573";
-        ctx.beginPath(); ctx.moveTo(bMid.x, bMid.y); ctx.lineTo(bR.x, bR.y); ctx.lineTo(tR.x, tR.y); ctx.lineTo(tMid.x, tMid.y); ctx.stroke();
-        
-        // Roof
-        ctx.strokeStyle = "#333";
-        ctx.beginPath(); ctx.moveTo(tL.x, tL.y); ctx.lineTo(h.x - h.size*0.4, tL.y - h.h*0.4); ctx.lineTo(tMid.x, tMid.y); ctx.stroke();
+        ctx.fillStyle = `rgba(200, 50, 50, ${leftLight})`; // Left Wall Shading
+        ctx.beginPath(); ctx.moveTo(bMid.x, bMid.y); ctx.lineTo(bL.x, bL.y); ctx.lineTo(tL.x, tL.y); ctx.lineTo(tMid.x, tMid.y); ctx.fill();
+        ctx.strokeStyle = "#ff4757"; ctx.stroke();
 
-        // Helper Dot (Green)
+        ctx.fillStyle = `rgba(200, 50, 50, ${rightLight})`; // Right Wall Shading
+        ctx.beginPath(); ctx.moveTo(bMid.x, bMid.y); ctx.lineTo(bR.x, bR.y); ctx.lineTo(tR.x, tR.y); ctx.lineTo(tMid.x, tMid.y); ctx.fill();
+        ctx.strokeStyle = "#2ed573"; ctx.stroke();
+
+        // Roof
+        ctx.fillStyle = "#555";
+        ctx.beginPath(); ctx.moveTo(tL.x, tL.y); ctx.lineTo(h.x - wDist*0.5, tL.y - h.h*0.5); ctx.lineTo(tMid.x, tMid.y); ctx.stroke();
+
         if(!clean) {
             ctx.fillStyle = isSel ? "#2f3542" : "#2ed573";
             ctx.beginPath(); ctx.arc(h.x, h.y, isSel ? 10 : 7, 0, 7); ctx.fill();
         }
     });
 
-    // Vanishing Points (Red)
     if(!clean) {
         ctx.fillStyle = "#ff4757";
         [state.vpL, state.vpR].forEach(v => { ctx.beginPath(); ctx.arc(v.x, v.y, 10, 0, 7); ctx.fill(); });
@@ -187,12 +157,9 @@ function draw(clean = false) {
 }
 
 function start(e) {
-    const mx = e.clientX, my = e.clientY;
-    activeObj = null;
+    const mx = e.clientX, my = e.clientY; activeObj = null;
     [state.vpL, state.vpR].forEach(v => { if(Math.hypot(v.x-mx, v.y-my) < 25) activeObj = v; });
-    state.houses.forEach(h => { 
-        if(Math.hypot(h.x-mx, h.y-my) < 25) { activeObj = h; select(h); }
-    });
+    state.houses.forEach(h => { if(Math.hypot(h.x-mx, h.y-my) < 25) { activeObj = h; select(h); } });
     if(!activeObj) select(null);
     draw();
 }

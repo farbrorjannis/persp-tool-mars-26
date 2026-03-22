@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Artist Perspective Tool - Sun & Depth Fixed</title>
+    <title>Artist Perspective Tool - Wireframe Roof 360</title>
     <style>
         body { margin: 0; overflow: hidden; background: #f0f2f5; font-family: sans-serif; }
         canvas { display: block; background: white; cursor: crosshair; }
@@ -83,7 +83,6 @@ function init() {
 
     resize();
     state.houses.push({ x: width * 0.4, y: height * 0.6, size: 100, h: 70, rot: 35 });
-    state.houses.push({ x: width * 0.5, y: height * 0.8, size: 120, h: 80, rot: 15 });
     draw();
 }
 
@@ -110,27 +109,12 @@ function getP(p, vp, tx) { return { x: tx, y: p.y + (vp.y - p.y) / (vp.x - p.x) 
 
 function draw(clean = false) {
     ctx.clearRect(0, 0, width, height);
-    
-    // --- DRAW SUN (Visual feedback) ---
-    const sunAngleDeg = parseInt(sunSld.value);
-    const sunAngleRad = (sunAngleDeg * Math.PI) / 180;
-    if(!clean) {
-        const sunDist = 250; // Radie för solens bana
-        const sunX = (width/2) + Math.cos(sunAngleRad) * sunDist;
-        const sunY = (state.vpL.y - 100) + Math.sin(sunAngleRad) * 50; 
-        ctx.fillStyle = "#FFD700";
-        ctx.beginPath(); ctx.arc(sunX, sunY, 15, 0, 7); ctx.fill();
-        // Ljusstråle-indikator
-        ctx.setLineDash([5, 5]); ctx.strokeStyle = "#FFD700";
-        ctx.beginPath(); ctx.moveTo(sunX, sunY); ctx.lineTo(width/2, height/2); ctx.stroke();
-        ctx.setLineDash([]);
-    }
+    const sunAngleRad = (parseInt(sunSld.value) * Math.PI) / 180;
 
-    // Horizon line
+    // Drawing the Horizon
     ctx.strokeStyle = "#ddd";
     ctx.beginPath(); ctx.moveTo(0, state.vpL.y); ctx.lineTo(width, state.vpR.y); ctx.stroke();
 
-    // SORT: Draw back to front
     const sortedHouses = [...state.houses].sort((a, b) => a.y - b.y);
 
     sortedHouses.forEach(h => {
@@ -150,9 +134,12 @@ function draw(clean = false) {
         const tR = { x: bR.x, y: bR.y - h.h };
         const tBack = { x: bBack.x, y: bBack.y - h.h };
 
+        // Roof Peak Logic
+        const peakHeight = h.h * 0.6;
+        const tPeak = { x: (tL.x + tR.x)/2, y: (tL.y + tR.y)/2 - peakHeight };
+
         const drawFace = (p1, p2, p3, p4, wallAngleOffset) => {
             const wallAngle = rotRad + wallAngleOffset;
-            // Shading math: Cosine of difference between sun and wall normal
             const diff = Math.cos(wallAngle - sunAngleRad);
             const shade = diff > 0 ? "#e0e0e0" : "#606060"; 
 
@@ -167,25 +154,41 @@ function draw(clean = false) {
             ctx.stroke();
         };
 
-        // Draw faces in order to ensure volume
+        // Walls (Order matters for depth)
         drawFace(bL, bBack, tBack, tL, -Math.PI/2); 
         drawFace(bR, bBack, tBack, tR, 0);          
         drawFace(bMid, bL, tL, tMid, Math.PI);      
         drawFace(bMid, bR, tR, tMid, Math.PI/2);    
 
-        // Roof
-        const tPeak = { x: (tL.x + tR.x)/2, y: tMid.y - h.h*0.6 };
-        ctx.fillStyle = "#f5f5f5";
-        ctx.beginPath();
-        ctx.moveTo(tL.x, tL.y); ctx.lineTo(tPeak.x, tPeak.y); ctx.lineTo(tMid.x, tMid.y);
-        ctx.lineTo(tR.x, tR.y); ctx.lineTo(tBack.x, tBack.y); ctx.lineTo(tPeak.x, tPeak.y);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
+        // --- WIREFRAME ROOF ---
+        ctx.strokeStyle = "#333";
+        ctx.lineWidth = isSel ? 2 : 1;
+        ctx.fillStyle = "rgba(255,255,255,0.2)"; // Slight fill for roof planes
+
+        const drawRoofPlane = (p1, p2, p3) => {
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.lineTo(p3.x, p3.y);
+            ctx.closePath(); ctx.fill(); ctx.stroke();
+        };
+
+        // Draw 4 triangles of the roof
+        drawRoofPlane(tL, tMid, tPeak);
+        drawRoofPlane(tMid, tR, tPeak);
+        drawRoofPlane(tR, tBack, tPeak);
+        drawRoofPlane(tBack, tL, tPeak);
 
         if(!clean) {
             ctx.fillStyle = isSel ? "#000" : "#2ed573";
             ctx.beginPath(); ctx.arc(h.x, h.y, 8, 0, 7); ctx.fill();
         }
     });
+
+    // Sun Visual (Feedback)
+    if(!clean) {
+        const sX = width/2 + Math.cos(sunAngleRad) * 200;
+        const sY = state.vpL.y - 120 + Math.sin(sunAngleRad) * 40;
+        ctx.fillStyle = "#FFD700"; ctx.beginPath(); ctx.arc(sX, sY, 12, 0, 7); ctx.fill();
+    }
 
     if(!clean) {
         ctx.fillStyle = "#ff4757";

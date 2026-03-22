@@ -1,0 +1,208 @@
+Här är den uppdaterade koden. Jag har lagt till en "Settings Panel" med sliders (skjutreglage) där du kan ändra storlek (Scale) och höjd (Height) på stugorna. Detta är perfekt för en konstnär som vill planera om en stuga ska vara en liten lada eller ett högt hus.
+Spara detta som index.html. Om du vill ha en prydlig GitHub-repo kan du senare bryta ut CSS och JS, men för att testa direkt fungerar denna allt-i-ett-fil bäst.
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artist Perspective Tool - Pro Edition</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #eef2f3; font-family: 'Segoe UI', sans-serif; }
+        canvas { background: #ffffff; display: block; cursor: crosshair; }
+        
+        .ui-container {
+            position: absolute; top: 20px; left: 20px;
+            display: flex; flex-direction: column; gap: 15px;
+            pointer-events: none;
+        }
+
+        .panel { 
+            background: rgba(255, 255, 255, 0.95); 
+            padding: 20px; border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 260px; pointer-events: all;
+        }
+
+        h1 { margin: 0 0 10px 0; font-size: 18px; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+        .instruction { font-size: 12px; color: #666; margin-bottom: 10px; line-height: 1.4; }
+        
+        .control-group { margin-top: 15px; }
+        label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #444; }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        
+        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="ui-container">
+    <!-- Info Panel -->
+    <div class="panel">
+        <h1>Perspective Helper</h1>
+        <div class="instruction"><span class="dot" style="background: #ff4757;"></span> Drag <b>Red Dots</b> for Horizon/VP.</div>
+        <div class="instruction"><span class="dot" style="background: #2ed573;"></span> Drag <b>Green Dots</b> to move Cottages.</div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="panel">
+        <label>Cottage Global Scale</label>
+        <input type="range" id="sizeSlider" min="20" max="150" value="70">
+        
+        <div class="control-group">
+            <label>Wall Height</label>
+            <input type="range" id="heightSlider" min="10" max="150" value="60">
+        </div>
+        
+        <div class="control-group">
+            <label>Grid Opacity</label>
+            <input type="range" id="alphaSlider" min="10" max="100" value="60">
+        </div>
+    </div>
+</div>
+
+<canvas id="perspectiveCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('perspectiveCanvas');
+const ctx = canvas.getContext('2d');
+
+// UI Elements
+const sizeSlider = document.getElementById('sizeSlider');
+const heightSlider = document.getElementById('heightSlider');
+const alphaSlider = document.getElementById('alphaSlider');
+
+let width, height;
+let activeObject = null;
+
+const app = {
+    vpLeft: { x: 150, y: 350, id: 'vp-left' },
+    vpRight: { x: 1100, y: 350, id: 'vp-right' },
+    houses: [
+        { x: 400, y: 550, offsetW: -1, offsetD: 1.2 },
+        { x: 750, y: 500, offsetW: -0.8, offsetD: 1 },
+        { x: 580, y: 400, offsetW: -0.6, offsetD: 0.8 }
+    ]
+};
+
+function init() {
+    resize();
+    window.addEventListener('resize', resize);
+    canvas.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    
+    // Redraw when sliders move
+    [sizeSlider, heightSlider, alphaSlider].forEach(s => s.oninput = draw);
+}
+
+function resize() {
+    width = canvas.width = window.innerWidth;
+    height = canvas.height = window.innerHeight;
+    app.vpRight.x = width - 150;
+    draw();
+}
+
+function getPointOnLine(start, vp, targetX) {
+    const slope = (vp.y - start.y) / (vp.x - start.x);
+    return { x: targetX, y: start.y + slope * (targetX - start.x) };
+}
+
+function drawCottage(house) {
+    const globalSize = parseInt(sizeSlider.value);
+    const wallHeight = parseInt(heightSlider.value);
+    const opacity = alphaSlider.value / 100;
+    
+    const { x, y, offsetW, offsetD } = house;
+    const { vpLeft, vpRight } = app;
+
+    const bottomCenter = { x, y };
+    const topCenter = { x, y: y - wallHeight };
+
+    // Perspective calculation based on slider sizes
+    const bottomL = getPointOnLine(bottomCenter, vpLeft, x + (offsetW * globalSize));
+    const topL = getPointOnLine(topCenter, vpLeft, x + (offsetW * globalSize));
+    const bottomR = getPointOnLine(bottomCenter, vpRight, x + (offsetD * globalSize));
+    const topR = getPointOnLine(topCenter, vpRight, x + (offsetD * globalSize));
+
+    ctx.globalAlpha = opacity;
+    ctx.lineWidth = 1.5;
+
+    // Draw Left Side (Red Guide)
+    ctx.fillStyle = "#f8f9fa";
+    ctx.beginPath();
+    ctx.moveTo(bottomCenter.x, bottomCenter.y);
+    ctx.lineTo(bottomL.x, bottomL.y);
+    ctx.lineTo(topL.x, topL.y);
+    ctx.lineTo(topCenter.x, topCenter.y);
+    ctx.fill();
+    ctx.strokeStyle = "#ff4757";
+    ctx.stroke();
+
+    // Draw Right Side (Green Guide)
+    ctx.beginPath();
+    ctx.moveTo(bottomCenter.x, bottomCenter.y);
+    ctx.lineTo(bottomR.x, bottomR.y);
+    ctx.lineTo(topR.x, topR.y);
+    ctx.lineTo(topCenter.x, topCenter.y);
+    ctx.fill();
+    ctx.strokeStyle = "#2ed573";
+    ctx.stroke();
+
+    // Simple Roof
+    ctx.beginPath();
+    ctx.moveTo(topL.x, topL.y);
+    ctx.lineTo(x + (offsetW * globalSize * 0.5), topL.y - (wallHeight * 0.4));
+    ctx.lineTo(topCenter.x, topCenter.y);
+    ctx.strokeStyle = "#2f3542";
+    ctx.stroke();
+
+    ctx.globalAlpha = 1.0;
+    // Interaction Handle
+    ctx.fillStyle = "#2ed573";
+    ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI*2); ctx.fill();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, width, height);
+
+    // Horizon Line
+    ctx.strokeStyle = "#adb5bd";
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(0, app.vpLeft.y);
+    ctx.lineTo(width, app.vpRight.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw Houses
+    app.houses.forEach(drawCottage);
+
+    // Draw VPs
+    ctx.fillStyle = "#ff4757";
+    [app.vpLeft, app.vpRight].forEach(vp => {
+        ctx.beginPath(); ctx.arc(vp.x, vp.y, 10, 0, Math.PI*2); ctx.fill();
+    });
+}
+
+function onMouseDown(e) {
+    const mx = e.clientX, my = e.clientY;
+    [app.vpLeft, app.vpRight, ...app.houses].forEach(obj => {
+        if (Math.hypot(obj.x - mx, obj.y - my) < 20) activeObject = obj;
+    });
+}
+
+function onMouseMove(e) {
+    if (!activeObject) return;
+    activeObject.x = e.clientX;
+    activeObject.y = e.clientY;
+    if (activeObject.id) app.vpLeft.y = app.vpRight.y = e.clientY;
+    draw();
+}
+
+function onMouseUp() { activeObject = null; }
+
+init();
+</script>
+</body>
+</html>

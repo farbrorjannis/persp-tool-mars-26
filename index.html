@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Artist Perspective Tool - Wireframe 360</title>
+    <title>Artist Perspective Tool - High Contrast Shading</title>
     <style>
         body { margin: 0; overflow: hidden; background: #f0f2f5; font-family: sans-serif; }
         canvas { display: block; background: white; cursor: crosshair; }
@@ -12,11 +11,15 @@
         h1 { font-size: 16px; margin: 0 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         label { display: block; font-size: 11px; font-weight: bold; margin: 8px 0 3px; color: #666; text-transform: uppercase; }
         input[type="range"] { width: 100%; cursor: pointer; }
-        button { width: 100%; padding: 10px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; margin-top: 8px; }
+        
+        /* Button Styling */
+        .btn-group { display: flex; gap: 5px; margin-top: 10px; }
+        button { flex: 1; padding: 10px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; font-size: 11px; transition: 0.2s; }
         #addBtn { background: #2ed573; color: white; }
-        #dlBtn { background: #3498db; color: white; }
-        #delBtn { background: #ff4757; color: white; opacity: 0.3; }
-        #delBtn.active { opacity: 1; }
+        #delBtn { background: #ff4757; color: white; opacity: 0.3; cursor: not-allowed; }
+        #delBtn.active { opacity: 1; cursor: pointer; }
+        #dlBtn { background: #3498db; color: white; width: 100%; margin-top: 5px; }
+        
         .status { font-size: 11px; color: #888; text-align: center; margin-top: 8px; }
     </style>
 </head>
@@ -25,11 +28,11 @@
 <div class="ui">
     <div class="panel">
         <h1>Global</h1>
-        <label>Sun Position</label>
-        <input type="range" id="sunSld" min="0" max="1200" value="600">
-        <button id="addBtn">Add Cottage</button>
+        <label>Sun Direction</label>
+        <input type="range" id="sunSld" min="0" max="360" value="180">
         <button id="dlBtn">Download Sketch</button>
     </div>
+    
     <div class="panel">
         <h1>Cottage Settings</h1>
         <label>Size & Height</label>
@@ -37,7 +40,12 @@
         <input type="range" id="heightSld" min="10" max="200" value="60">
         <label>Rotation (360°)</label>
         <input type="range" id="rotSld" min="0" max="360" value="45">
-        <button id="delBtn" disabled>Delete Selected</button>
+        
+        <!-- Knappar samlade nära varandra -->
+        <div class="btn-group">
+            <button id="addBtn">Add New</button>
+            <button id="delBtn" disabled>Delete</button>
+        </div>
         <p id="status" class="status">Select a green anchor</p>
     </div>
 </div>
@@ -87,7 +95,7 @@ function select(h) {
     if(h) {
         sizeSld.value = h.size; heightSld.value = h.h; rotSld.value = h.rot;
         delBtn.disabled = false; delBtn.classList.add('active');
-        statusTxt.innerText = "Editing Selected";
+        statusTxt.innerText = "Cottage Selected";
     } else {
         delBtn.disabled = true; delBtn.classList.remove('active');
         statusTxt.innerText = "Select a green anchor";
@@ -98,11 +106,9 @@ function resize() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
     state.vpR.x = width - 150;
-    sunSld.max = width;
     draw();
 }
 
-// Perspective Math
 function getP(p, vp, tx) { return { x: tx, y: p.y + (vp.y - p.y) / (vp.x - p.x) * (tx - p.x) }; }
 
 function draw(clean = false) {
@@ -110,62 +116,60 @@ function draw(clean = false) {
     ctx.strokeStyle = "#ddd";
     ctx.beginPath(); ctx.moveTo(0, state.vpL.y); ctx.lineTo(width, state.vpR.y); ctx.stroke();
 
-    const sunX = parseInt(sunSld.value);
-    if(!clean) { ctx.fillStyle = "#FFD700"; ctx.beginPath(); ctx.arc(sunX, state.vpL.y - 15, 10, 0, 7); ctx.fill(); }
+    const sunAngle = (parseInt(sunSld.value) * Math.PI) / 180;
 
     state.houses.forEach(h => {
         const isSel = (h === selectedHouse && !clean);
-        const angle = (h.rot * Math.PI) / 180;
+        const rotRad = (h.rot * Math.PI) / 180;
         
-        // Calculate 4 Base Points (Bottom)
         const bMid = { x: h.x, y: h.y };
-        const xL = h.x - h.size * Math.cos(angle);
-        const xR = h.x + h.size * Math.sin(angle);
+        const xL = h.x - h.size * Math.cos(rotRad);
+        const xR = h.x + h.size * Math.sin(rotRad);
         
         const bL = getP(bMid, state.vpL, xL);
         const bR = getP(bMid, state.vpR, xR);
-        // Back corner (Opposite of bMid)
         const bBack = { x: bL.x + (bR.x - bMid.x), y: bL.y + (bR.y - bMid.y) };
 
-        // Calculate 4 Top Points (Height)
         const tMid = { x: bMid.x, y: bMid.y - h.h };
         const tL = { x: bL.x, y: bL.y - h.h };
         const tR = { x: bR.x, y: bR.y - h.h };
         const tBack = { x: bBack.x, y: bBack.y - h.h };
 
-        // Shading Logic
-        const shade = Math.max(0, Math.min(0.3, (sunX - h.x) / 500));
+        const drawFace = (p1, p2, p3, p4, wallAngleOffset) => {
+            const wallAngle = rotRad + wallAngleOffset;
+            // Dot product-liknande logik för ljus
+            const diff = Math.cos(wallAngle - sunAngle);
+            
+            // Om diff > 0 är väggen i solljus (ljusgrå), annars skugga (mörkgrå)
+            const shade = diff > 0 ? "#e0e0e0" : "#606060"; 
 
-        // Draw Wireframe Walls
-        ctx.lineWidth = isSel ? 3 : 1;
-        ctx.strokeStyle = "#444";
-        
-        const drawFace = (p1, p2, p3, p4, color) => {
-            ctx.fillStyle = color;
+            ctx.fillStyle = shade;
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
             ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
             ctx.closePath();
-            ctx.fill(); ctx.stroke();
+            ctx.fill();
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = isSel ? 2 : 1;
+            ctx.stroke();
         };
 
-        // Render 4 Walls with light tones
-        ctx.globalAlpha = 0.4;
-        drawFace(bMid, bL, tL, tMid, `rgba(200,0,0,${0.2+shade})`); // Side 1
-        drawFace(bMid, bR, tR, tMid, `rgba(0,200,0,${0.2-shade})`); // Side 2
-        drawFace(bL, bBack, tBack, tL, "rgba(200,200,200,0.1)");    // Back 1
-        drawFace(bR, bBack, tBack, tR, "rgba(200,200,200,0.1)");    // Back 2
+        // Rita de fyra väggarna
+        drawFace(bMid, bL, tL, tMid, Math.PI);      
+        drawFace(bMid, bR, tR, tMid, Math.PI/2);    
+        drawFace(bL, bBack, tBack, tL, -Math.PI/2); 
+        drawFace(bR, bBack, tBack, tR, 0);          
 
-        // Roof (Wireframe)
-        const tPeak = { x: (tL.x + tR.x)/2, y: tMid.y - h.h*0.5 };
+        // Taket (alltid ljusare för att separera)
+        const tPeak = { x: (tL.x + tR.x)/2, y: tMid.y - h.h*0.6 };
+        ctx.fillStyle = "#f5f5f5";
         ctx.beginPath();
         ctx.moveTo(tL.x, tL.y); ctx.lineTo(tPeak.x, tPeak.y); ctx.lineTo(tMid.x, tMid.y);
         ctx.lineTo(tR.x, tR.y); ctx.lineTo(tBack.x, tBack.y); ctx.lineTo(tPeak.x, tPeak.y);
-        ctx.stroke();
+        ctx.closePath(); ctx.fill(); ctx.stroke();
 
-        ctx.globalAlpha = 1.0;
         if(!clean) {
-            ctx.fillStyle = isSel ? "#333" : "#2ed573";
+            ctx.fillStyle = isSel ? "#000" : "#2ed573";
             ctx.beginPath(); ctx.arc(h.x, h.y, 8, 0, 7); ctx.fill();
         }
     });

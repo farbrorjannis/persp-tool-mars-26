@@ -2,50 +2,51 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Artist Perspective Tool - Natural View & Sun</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PerspectiveGrid Pro - Mobile Optimized</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #f0f2f5; font-family: sans-serif; }
-        canvas { display: block; background: white; cursor: crosshair; }
-        .ui { position: absolute; top: 20px; left: 20px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; width: 260px; }
-        .panel { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: all; }
-        h1 { font-size: 14px; margin: 0 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        label { display: block; font-size: 10px; font-weight: bold; margin: 8px 0 3px; color: #666; text-transform: uppercase; }
-        input[type="range"] { width: 100%; cursor: pointer; }
+        /* Förhindrar scrolling när man ritar */
+        body { margin: 0; overflow: hidden; background: #f0f2f5; font-family: sans-serif; touch-action: none; }
+        canvas { display: block; background: white; touch-action: none; }
+        
+        .ui { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; width: 220px; max-width: 90vw; }
+        .panel { background: white; padding: 12px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); pointer-events: all; }
+        
+        h1 { font-size: 14px; margin: 0 0 5px 0; }
+        label { display: block; font-size: 9px; font-weight: bold; margin: 8px 0 2px; color: #888; text-transform: uppercase; }
+        input[type="range"] { width: 100%; height: 25px; } /* Större träffyta för fingrar */
+        
         .btn-group { display: flex; gap: 4px; margin-top: 5px; }
-        button { flex: 1; padding: 8px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; font-size: 10px; transition: 0.2s; }
+        button { flex: 1; padding: 12px 5px; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; font-size: 10px; }
+        
         #addBtn { background: #2ed573; color: white; }
-        #delBtn { background: #ff4757; color: white; opacity: 0.3; }
+        #delBtn { background: #ff4757; color: white; opacity: 0.2; }
         #delBtn.active { opacity: 1; }
-        .norm-btn { background: #3498db; color: white; width: 100%; margin-top: 5px; }
-        .reset-btn { background: #7f8c8d; color: white; width: 100%; margin-top: 5px; }
+        .accent-btn { background: #3498db; color: white; width: 100%; margin-top: 5px; }
         #dlBtn { background: #2f3542; color: white; width: 100%; margin-top: 5px; }
-        .info-text { font-size: 10px; color: #7f8c8d; line-height: 1.3; margin-top: 8px; }
     </style>
 </head>
 <body>
 
 <div class="ui">
     <div class="panel">
-        <h1>Global Controls</h1>
+        <h1>PerspectiveGrid Pro</h1>
         <label>Sun Direction</label>
         <input type="range" id="sunSld" min="0" max="360" value="180">
-        <button id="normBtn" class="norm-btn">Normalize (Natural View)</button>
-        <button id="resetBtn" class="reset-btn">Reset (Bring Points Back)</button>
-        <p class="info-text"><b>Normalize:</b> Pushes points outside for a calm, realistic look. Human eyes hate "pointy" buildings!</p>
+        <button id="normBtn" class="accent-btn">Normalize View</button>
     </div>
     
     <div class="panel">
-        <h1>Cottage Settings</h1>
-        <label>Size / Height</label>
+        <label>Size / Height / Rotation</label>
         <input type="range" id="sizeSld" min="20" max="350" value="80">
         <input type="range" id="heightSld" min="10" max="250" value="60">
-        <label>Rotation (360°)</label>
         <input type="range" id="rotSld" min="0" max="360" value="45">
+        
         <div class="btn-group">
             <button id="addBtn">Add</button>
             <button id="delBtn" disabled>Delete</button>
         </div>
-        <button id="dlBtn">Download Image</button>
+        <button id="dlBtn">Download PNG</button>
     </div>
 </div>
 
@@ -56,37 +57,41 @@ const canvas = document.getElementById('cvs'), ctx = canvas.getContext('2d');
 const sizeSld = document.getElementById('sizeSld'), heightSld = document.getElementById('heightSld');
 const rotSld = document.getElementById('rotSld'), sunSld = document.getElementById('sunSld');
 const addBtn = document.getElementById('addBtn'), delBtn = document.getElementById('delBtn');
-const normBtn = document.getElementById('normBtn'), resetBtn = document.getElementById('resetBtn');
-const dlBtn = document.getElementById('dlBtn');
+const normBtn = document.getElementById('normBtn'), dlBtn = document.getElementById('dlBtn');
 
 let width, height, activeObj = null, selectedHouse = null;
-const state = { vpL: { x: 100, y: 350, isVP: true }, vpR: { x: 900, y: 350, isVP: true }, houses: [] };
+const state = { vpL: { x: 50, y: 300, isVP: true }, vpR: { x: 300, y: 300, isVP: true }, houses: [] };
 
 function init() {
     window.addEventListener('resize', resize);
-    canvas.addEventListener('mousedown', start);
-    window.addEventListener('mousemove', move);
+    
+    // MUS-HÄNDELSER
+    canvas.addEventListener('mousedown', (e) => handleStart(e.clientX, e.clientY));
+    window.addEventListener('mousemove', (e) => handleMove(e.clientX, e.clientY));
     window.addEventListener('mouseup', () => activeObj = null);
     
+    // TOUCH-HÄNDELSER (MOBIL)
+    canvas.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        handleStart(touch.clientX, touch.clientY);
+        e.preventDefault();
+    }, {passive: false});
+    
+    window.addEventListener('touchmove', (e) => {
+        const touch = e.touches[0];
+        handleMove(touch.clientX, touch.clientY);
+        e.preventDefault();
+    }, {passive: false});
+    
+    window.addEventListener('touchend', () => activeObj = null);
+
     addBtn.onclick = () => {
-        const h = { x: width/2, y: height/2 + 100, size: 80, h: 60, rot: 45 };
+        const h = { x: width/2, y: height/2 + 50, size: 80, h: 60, rot: 45 };
         state.houses.push(h); select(h); draw();
     };
 
     delBtn.onclick = () => { if(selectedHouse) { state.houses = state.houses.filter(h => h !== selectedHouse); select(null); draw(); } };
-    
-    normBtn.onclick = () => {
-        state.vpL.x = -800; state.vpR.x = width + 800;
-        state.vpL.y = state.vpR.y = height * 0.4;
-        draw();
-    };
-
-    resetBtn.onclick = () => {
-        state.vpL.x = 100; state.vpR.x = width - 100;
-        state.vpL.y = state.vpR.y = height * 0.4;
-        draw();
-    };
-
+    normBtn.onclick = () => { state.vpL.x = -width; state.vpR.x = width*2; draw(); };
     dlBtn.onclick = () => { draw(true); const a = document.createElement('a'); a.download = 'sketch.png'; a.href = canvas.toDataURL(); a.click(); draw(false); };
     
     [sizeSld, heightSld, rotSld, sunSld].forEach(el => el.oninput = () => {
@@ -99,8 +104,26 @@ function init() {
     });
 
     resize();
-    resetBtn.onclick(); 
-    addBtn.onclick();
+    if(state.houses.length === 0) addBtn.onclick();
+}
+
+function handleStart(mx, my) {
+    const r = canvas.getBoundingClientRect();
+    const x = mx - r.left, y = my - r.top;
+    activeObj = null;
+    [state.vpL, state.vpR].forEach(v => { if(Math.hypot(v.x-x, v.y-y) < 30) activeObj = v; });
+    const sorted = [...state.houses].sort((a, b) => b.y - a.y);
+    for(let h of sorted) { if(Math.hypot(h.x-x, h.y-y) < 30) { activeObj = h; select(h); break; } }
+    if(!activeObj) select(null);
+    draw();
+}
+
+function handleMove(mx, my) {
+    if(!activeObj) return;
+    const r = canvas.getBoundingClientRect();
+    activeObj.x = mx - r.left; activeObj.y = my - r.top;
+    if(activeObj.isVP) state.vpL.y = state.vpR.y = activeObj.y;
+    draw();
 }
 
 function select(h) {
@@ -116,6 +139,7 @@ function select(h) {
 function resize() {
     width = canvas.width = window.innerWidth;
     height = canvas.height = window.innerHeight;
+    state.vpR.x = width - 50;
     draw();
 }
 
@@ -124,87 +148,49 @@ function getP(p, vp, tx) { return { x: tx, y: p.y + (vp.y - p.y) / (vp.x - p.x) 
 function draw(clean = false) {
     ctx.clearRect(0, 0, width, height);
     const sunAngleRad = (parseInt(sunSld.value) * Math.PI) / 180;
-
-    // Sun Visual
-    if(!clean) {
-        const sX = width/2 + Math.cos(sunAngleRad) * 200;
-        const sY = state.vpL.y - 120 + Math.sin(sunAngleRad) * 40;
-        ctx.fillStyle = "#FFD700"; ctx.beginPath(); ctx.arc(sX, sY, 15, 0, 7); ctx.fill();
-        ctx.strokeStyle = "rgba(255,215,0,0.3)"; ctx.setLineDash([5,5]);
-        ctx.beginPath(); ctx.moveTo(sX, sY); ctx.lineTo(width/2, height/2); ctx.stroke(); ctx.setLineDash([]);
-    }
-
-    // Horizon
     ctx.strokeStyle = "#ddd";
     ctx.beginPath(); ctx.moveTo(0, state.vpL.y); ctx.lineTo(width, state.vpR.y); ctx.stroke();
 
-    const sortedHouses = [...state.houses].sort((a, b) => a.y - b.y);
-
-    sortedHouses.forEach(h => {
+    const sorted = [...state.houses].sort((a, b) => a.y - b.y);
+    sorted.forEach(h => {
         const isSel = (h === selectedHouse && !clean);
         const rotRad = (h.rot * Math.PI) / 180;
         const bMid = { x: h.x, y: h.y };
-        const xL = h.x - h.size * Math.cos(rotRad);
-        const xR = h.x + h.size * Math.sin(rotRad);
-        const bL = getP(bMid, state.vpL, xL);
-        const bR = getP(bMid, state.vpR, xR);
+        const xL = h.x - h.size * Math.cos(rotRad), xR = h.x + h.size * Math.sin(rotRad);
+        const bL = getP(bMid, state.vpL, xL), bR = getP(bMid, state.vpR, xR);
         const bBack = { x: bL.x + (bR.x - bMid.x), y: bL.y + (bR.y - bMid.y) };
+        const tMid = { x: bMid.x, y: bMid.y - h.h }, tL = { x: bL.x, y: bL.y - h.h };
+        const tR = { x: bR.x, y: bR.y - h.h }, tBack = { x: bBack.x, y: bBack.y - h.h };
 
-        const tMid = { x: bMid.x, y: bMid.y - h.h };
-        const tL = { x: bL.x, y: bL.y - h.h };
-        const tR = { x: bR.x, y: bR.y - h.h };
-        const tBack = { x: bBack.x, y: bBack.y - h.h };
-
-        const drawFace = (p1, p2, p3, p4, wallAngleOffset) => {
-            const diff = Math.cos(rotRad + wallAngleOffset - sunAngleRad);
-            ctx.fillStyle = diff > 0 ? "#e0e0e0" : "#606060"; 
+        const drawFace = (p1, p2, p3, p4, offset) => {
+            const diff = Math.cos(rotRad + offset - sunAngleRad);
+            ctx.fillStyle = diff > 0 ? "#eeeeee" : "#999999"; 
             ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
             ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.closePath();
             ctx.fill(); ctx.strokeStyle = "#333"; ctx.lineWidth = isSel ? 3 : 1; ctx.stroke();
         };
 
-        drawFace(bL, bBack, tBack, tL, -Math.PI/2); 
-        drawFace(bR, bBack, tBack, tR, 0);          
-        drawFace(bMid, bL, tL, tMid, Math.PI);      
-        drawFace(bMid, bR, tR, tMid, Math.PI/2);    
+        drawFace(bL, bBack, tBack, tL, -Math.PI/2); drawFace(bR, bBack, tBack, tR, 0);          
+        drawFace(bMid, bL, tL, tMid, Math.PI); drawFace(bMid, bR, tR, tMid, Math.PI/2);    
 
-        // Wireframe Roof
         const tPeak = { x: (tL.x + tR.x)/2, y: (tL.y + tR.y)/2 - h.h*0.6 };
-        ctx.fillStyle = "rgba(240,240,240,0.5)";
+        ctx.fillStyle = "rgba(245,245,245,0.7)";
         ctx.beginPath(); ctx.moveTo(tL.x, tL.y); ctx.lineTo(tPeak.x, tPeak.y); ctx.lineTo(tMid.x, tMid.y);
         ctx.lineTo(tR.x, tR.y); ctx.lineTo(tBack.x, tBack.y); ctx.lineTo(tPeak.x, tPeak.y);
         ctx.closePath(); ctx.fill(); ctx.stroke();
 
         if(!clean) {
             ctx.fillStyle = isSel ? "#000" : "#2ed573";
-            ctx.beginPath(); ctx.arc(h.x, h.y, 8, 0, 7); ctx.fill();
+            ctx.beginPath(); ctx.arc(h.x, h.y, 12, 0, 7); ctx.fill(); // Större punkt för touch
         }
     });
 
     if(!clean) {
         ctx.fillStyle = "#ff4757";
         [state.vpL, state.vpR].forEach(v => {
-            if(v.x > 0 && v.x < width) { ctx.beginPath(); ctx.arc(v.x, v.y, 10, 0, 7); ctx.fill(); }
+            if(v.x > 0 && v.x < width) { ctx.beginPath(); ctx.arc(v.x, v.y, 15, 0, 7); ctx.fill(); }
         });
     }
-}
-
-function start(e) {
-    const r = canvas.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
-    activeObj = null;
-    [state.vpL, state.vpR].forEach(v => { if(Math.hypot(v.x-mx, v.y-my) < 25) activeObj = v; });
-    const sorted = [...state.houses].sort((a, b) => b.y - a.y);
-    for(let h of sorted) { if(Math.hypot(h.x-mx, h.y-my) < 25) { activeObj = h; select(h); break; } }
-    if(!activeObj) select(null);
-    draw();
-}
-
-function move(e) {
-    if(!activeObj) return;
-    const r = canvas.getBoundingClientRect();
-    activeObj.x = e.clientX-r.left; activeObj.y = e.clientY-r.top;
-    if(activeObj.isVP) state.vpL.y = state.vpR.y = activeObj.y;
-    draw();
 }
 
 init();

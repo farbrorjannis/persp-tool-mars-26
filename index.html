@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Artist Perspective Tool - High Contrast Shading</title>
+    <title>Artist Perspective Tool - Depth & Occlusion</title>
     <style>
         body { margin: 0; overflow: hidden; background: #f0f2f5; font-family: sans-serif; }
         canvas { display: block; background: white; cursor: crosshair; }
@@ -11,15 +11,12 @@
         h1 { font-size: 16px; margin: 0 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         label { display: block; font-size: 11px; font-weight: bold; margin: 8px 0 3px; color: #666; text-transform: uppercase; }
         input[type="range"] { width: 100%; cursor: pointer; }
-        
-        /* Button Styling */
         .btn-group { display: flex; gap: 5px; margin-top: 10px; }
         button { flex: 1; padding: 10px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; font-size: 11px; transition: 0.2s; }
         #addBtn { background: #2ed573; color: white; }
         #delBtn { background: #ff4757; color: white; opacity: 0.3; cursor: not-allowed; }
         #delBtn.active { opacity: 1; cursor: pointer; }
         #dlBtn { background: #3498db; color: white; width: 100%; margin-top: 5px; }
-        
         .status { font-size: 11px; color: #888; text-align: center; margin-top: 8px; }
     </style>
 </head>
@@ -27,7 +24,7 @@
 
 <div class="ui">
     <div class="panel">
-        <h1>Global</h1>
+        <h1>Global Settings</h1>
         <label>Sun Direction</label>
         <input type="range" id="sunSld" min="0" max="360" value="180">
         <button id="dlBtn">Download Sketch</button>
@@ -41,7 +38,6 @@
         <label>Rotation (360°)</label>
         <input type="range" id="rotSld" min="0" max="360" value="45">
         
-        <!-- Knappar samlade nära varandra -->
         <div class="btn-group">
             <button id="addBtn">Add New</button>
             <button id="delBtn" disabled>Delete</button>
@@ -86,7 +82,8 @@ function init() {
     });
 
     resize();
-    state.houses.push({ x: width * 0.5, y: height * 0.7, size: 100, h: 70, rot: 35 });
+    state.houses.push({ x: width * 0.4, y: height * 0.6, size: 100, h: 70, rot: 35 });
+    state.houses.push({ x: width * 0.5, y: height * 0.8, size: 120, h: 80, rot: 15 });
     draw();
 }
 
@@ -118,7 +115,10 @@ function draw(clean = false) {
 
     const sunAngle = (parseInt(sunSld.value) * Math.PI) / 180;
 
-    state.houses.forEach(h => {
+    // SORTERING: Rita de som har lägst Y först (längst bort)
+    const sortedHouses = [...state.houses].sort((a, b) => a.y - b.y);
+
+    sortedHouses.forEach(h => {
         const isSel = (h === selectedHouse && !clean);
         const rotRad = (h.rot * Math.PI) / 180;
         
@@ -137,10 +137,7 @@ function draw(clean = false) {
 
         const drawFace = (p1, p2, p3, p4, wallAngleOffset) => {
             const wallAngle = rotRad + wallAngleOffset;
-            // Dot product-liknande logik för ljus
             const diff = Math.cos(wallAngle - sunAngle);
-            
-            // Om diff > 0 är väggen i solljus (ljusgrå), annars skugga (mörkgrå)
             const shade = diff > 0 ? "#e0e0e0" : "#606060"; 
 
             ctx.fillStyle = shade;
@@ -150,17 +147,18 @@ function draw(clean = false) {
             ctx.closePath();
             ctx.fill();
             ctx.strokeStyle = "#333";
-            ctx.lineWidth = isSel ? 2 : 1;
+            ctx.lineWidth = isSel ? 3 : 1;
             ctx.stroke();
         };
 
-        // Rita de fyra väggarna
-        drawFace(bMid, bL, tL, tMid, Math.PI);      
-        drawFace(bMid, bR, tR, tMid, Math.PI/2);    
+        // RITA VÄGGAR: Vi ritar de bakre väggarna först inuti objektet
+        // (Enkel backface culling/sorting för varje enskilt hus)
         drawFace(bL, bBack, tBack, tL, -Math.PI/2); 
         drawFace(bR, bBack, tBack, tR, 0);          
+        drawFace(bMid, bL, tL, tMid, Math.PI);      
+        drawFace(bMid, bR, tR, tMid, Math.PI/2);    
 
-        // Taket (alltid ljusare för att separera)
+        // Taket
         const tPeak = { x: (tL.x + tR.x)/2, y: tMid.y - h.h*0.6 };
         ctx.fillStyle = "#f5f5f5";
         ctx.beginPath();
@@ -184,7 +182,13 @@ function start(e) {
     const r = canvas.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
     activeObj = null;
     [state.vpL, state.vpR].forEach(v => { if(Math.hypot(v.x-mx, v.y-my) < 25) activeObj = v; });
-    state.houses.forEach(h => { if(Math.hypot(h.x-mx, h.y-my) < 25) { activeObj = h; select(h); } });
+    
+    // VÄLJ RÄTT HUS: Kolla de närmaste först vid klick
+    const sortedForClick = [...state.houses].sort((a, b) => b.y - a.y);
+    for(let h of sortedForClick) {
+        if(Math.hypot(h.x-mx, h.y-my) < 25) { activeObj = h; select(h); break; }
+    }
+    
     if(!activeObj) select(null);
     draw();
 }

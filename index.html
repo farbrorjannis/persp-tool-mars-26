@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Artist Perspective Pro - 2PT vs 3PT</title>
+    <title>Artist Perspective Tool - Natural View & Sun</title>
     <style>
         body { margin: 0; overflow: hidden; background: #f0f2f5; font-family: sans-serif; }
         canvas { display: block; background: white; cursor: crosshair; }
@@ -10,36 +10,35 @@
         .panel { background: white; padding: 12px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: all; }
         h1 { font-size: 14px; margin: 0 0 8px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         label { display: block; font-size: 10px; font-weight: bold; margin: 8px 0 3px; color: #666; text-transform: uppercase; }
-        input[type="range"], select { width: 100%; cursor: pointer; margin-bottom: 5px; }
+        input[type="range"] { width: 100%; cursor: pointer; }
         .btn-group { display: flex; gap: 4px; margin-top: 5px; }
         button { flex: 1; padding: 8px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; font-size: 10px; transition: 0.2s; }
         #addBtn { background: #2ed573; color: white; }
         #delBtn { background: #ff4757; color: white; opacity: 0.3; }
         #delBtn.active { opacity: 1; }
-        #normBtn { background: #3498db; color: white; margin-top: 5px; width: 100%; }
-        #dlBtn { background: #7f8c8d; color: white; width: 100%; margin-top: 5px; }
-        .info-text { font-size: 10px; color: #7f8c8d; line-height: 1.3; margin-top: 5px; }
+        .norm-btn { background: #3498db; color: white; width: 100%; margin-top: 5px; }
+        .reset-btn { background: #7f8c8d; color: white; width: 100%; margin-top: 5px; }
+        #dlBtn { background: #2f3542; color: white; width: 100%; margin-top: 5px; }
+        .info-text { font-size: 10px; color: #7f8c8d; line-height: 1.3; margin-top: 8px; }
     </style>
 </head>
 <body>
 
 <div class="ui">
     <div class="panel">
-        <h1>Perspective Engine</h1>
-        <label>Mode</label>
-        <select id="modeSel">
-            <option value="2pt">2-Point (Natural)</option>
-            <option value="3pt">3-Point (Bird's Eye)</option>
-        </select>
-        <button id="normBtn">Normalize (Natural View)</button>
-        <p class="info-text"><b>Tip:</b> Human eyes prefer vanishing points far apart. "Normalize" pushes them outside the screen for a realistic look.</p>
+        <h1>Global Controls</h1>
+        <label>Sun Direction</label>
+        <input type="range" id="sunSld" min="0" max="360" value="180">
+        <button id="normBtn" class="norm-btn">Normalize (Natural View)</button>
+        <button id="resetBtn" class="reset-btn">Reset (Bring Points Back)</button>
+        <p class="info-text"><b>Normalize:</b> Pushes points outside for a calm, realistic look. Human eyes hate "pointy" buildings!</p>
     </div>
     
     <div class="panel">
-        <h1>Cottage Controls</h1>
+        <h1>Cottage Settings</h1>
         <label>Size / Height</label>
-        <input type="range" id="sizeSld" min="20" max="400" value="100">
-        <input type="range" id="heightSld" min="10" max="300" value="80">
+        <input type="range" id="sizeSld" min="20" max="350" value="80">
+        <input type="range" id="heightSld" min="10" max="250" value="60">
         <label>Rotation (360°)</label>
         <input type="range" id="rotSld" min="0" max="360" value="45">
         <div class="btn-group">
@@ -55,17 +54,13 @@
 <script>
 const canvas = document.getElementById('cvs'), ctx = canvas.getContext('2d');
 const sizeSld = document.getElementById('sizeSld'), heightSld = document.getElementById('heightSld');
-const rotSld = document.getElementById('rotSld'), modeSel = document.getElementById('modeSel');
+const rotSld = document.getElementById('rotSld'), sunSld = document.getElementById('sunSld');
 const addBtn = document.getElementById('addBtn'), delBtn = document.getElementById('delBtn');
-const normBtn = document.getElementById('normBtn'), dlBtn = document.getElementById('dlBtn');
+const normBtn = document.getElementById('normBtn'), resetBtn = document.getElementById('resetBtn');
+const dlBtn = document.getElementById('dlBtn');
 
 let width, height, activeObj = null, selectedHouse = null;
-const state = { 
-    vpL: { x: -500, y: 400, isVP: true }, 
-    vpR: { x: 2000, y: 400, isVP: true }, 
-    vpZenith: { x: 500, y: -2000, isVP: true }, // The 3rd point
-    houses: [] 
-};
+const state = { vpL: { x: 100, y: 350, isVP: true }, vpR: { x: 900, y: 350, isVP: true }, houses: [] };
 
 function init() {
     window.addEventListener('resize', resize);
@@ -74,7 +69,7 @@ function init() {
     window.addEventListener('mouseup', () => activeObj = null);
     
     addBtn.onclick = () => {
-        const h = { x: width/2, y: height * 0.7, size: 100, h: 80, rot: 45 };
+        const h = { x: width/2, y: height/2 + 100, size: 80, h: 60, rot: 45 };
         state.houses.push(h); select(h); draw();
     };
 
@@ -83,13 +78,18 @@ function init() {
     normBtn.onclick = () => {
         state.vpL.x = -800; state.vpR.x = width + 800;
         state.vpL.y = state.vpR.y = height * 0.4;
-        state.vpZenith.x = width / 2; state.vpZenith.y = -3000;
         draw();
     };
 
-    dlBtn.onclick = () => { draw(true); const a = document.createElement('a'); a.download = 'perspective.png'; a.href = canvas.toDataURL(); a.click(); draw(false); };
+    resetBtn.onclick = () => {
+        state.vpL.x = 100; state.vpR.x = width - 100;
+        state.vpL.y = state.vpR.y = height * 0.4;
+        draw();
+    };
+
+    dlBtn.onclick = () => { draw(true); const a = document.createElement('a'); a.download = 'sketch.png'; a.href = canvas.toDataURL(); a.click(); draw(false); };
     
-    [sizeSld, heightSld, rotSld, modeSel].forEach(el => el.oninput = () => {
+    [sizeSld, heightSld, rotSld, sunSld].forEach(el => el.oninput = () => {
         if(selectedHouse) {
             selectedHouse.size = parseInt(sizeSld.value);
             selectedHouse.h = parseInt(heightSld.value);
@@ -99,7 +99,7 @@ function init() {
     });
 
     resize();
-    normBtn.onclick(); // Start with natural view
+    resetBtn.onclick(); 
     addBtn.onclick();
 }
 
@@ -119,25 +119,21 @@ function resize() {
     draw();
 }
 
-// Key Perspective Function
-function project(p, vp, targetX) {
-    if (Math.abs(vp.x - p.x) < 0.1) return p.y;
-    return p.y + (vp.y - p.y) / (vp.x - p.x) * (targetX - p.x);
-}
-
-// 3rd Point projection for verticals
-function getVertical(p) {
-    if (modeSel.value === "2pt") return p;
-    // Calculate tilt towards Zenith
-    const dx = state.vpZenith.x - p.x;
-    const dy = state.vpZenith.y - p.y;
-    const distRatio = 0.05; // Strength of 3pt effect
-    return { x: p.x, y: p.y }; // Simplified for now, let's use direct project in draw
-}
+function getP(p, vp, tx) { return { x: tx, y: p.y + (vp.y - p.y) / (vp.x - p.x) * (tx - p.x) }; }
 
 function draw(clean = false) {
     ctx.clearRect(0, 0, width, height);
-    
+    const sunAngleRad = (parseInt(sunSld.value) * Math.PI) / 180;
+
+    // Sun Visual
+    if(!clean) {
+        const sX = width/2 + Math.cos(sunAngleRad) * 200;
+        const sY = state.vpL.y - 120 + Math.sin(sunAngleRad) * 40;
+        ctx.fillStyle = "#FFD700"; ctx.beginPath(); ctx.arc(sX, sY, 15, 0, 7); ctx.fill();
+        ctx.strokeStyle = "rgba(255,215,0,0.3)"; ctx.setLineDash([5,5]);
+        ctx.beginPath(); ctx.moveTo(sX, sY); ctx.lineTo(width/2, height/2); ctx.stroke(); ctx.setLineDash([]);
+    }
+
     // Horizon
     ctx.strokeStyle = "#ddd";
     ctx.beginPath(); ctx.moveTo(0, state.vpL.y); ctx.lineTo(width, state.vpR.y); ctx.stroke();
@@ -146,56 +142,36 @@ function draw(clean = false) {
 
     sortedHouses.forEach(h => {
         const isSel = (h === selectedHouse && !clean);
-        const rot = (h.rot * Math.PI) / 180;
-        
-        // Bottom Points
+        const rotRad = (h.rot * Math.PI) / 180;
         const bMid = { x: h.x, y: h.y };
-        const xL = h.x - h.size * Math.cos(rot);
-        const xR = h.x + h.size * Math.sin(rot);
-        const bL = { x: xL, y: project(bMid, state.vpL, xL) };
-        const bR = { x: xR, y: project(bMid, state.vpR, xR) };
+        const xL = h.x - h.size * Math.cos(rotRad);
+        const xR = h.x + h.size * Math.sin(rotRad);
+        const bL = getP(bMid, state.vpL, xL);
+        const bR = getP(bMid, state.vpR, xR);
         const bBack = { x: bL.x + (bR.x - bMid.x), y: bL.y + (bR.y - bMid.y) };
 
-        // Top Points (Height)
-        const tMidRaw = { x: bMid.x, y: bMid.y - h.h };
-        const tLRaw = { x: bL.x, y: bL.y - h.h };
-        const tRRaw = { x: bR.x, y: bR.y - h.h };
-        const tBackRaw = { x: bBack.x, y: bBack.y - h.h };
+        const tMid = { x: bMid.x, y: bMid.y - h.h };
+        const tL = { x: bL.x, y: bL.y - h.h };
+        const tR = { x: bR.x, y: bR.y - h.h };
+        const tBack = { x: bBack.x, y: bBack.y - h.h };
 
-        // Apply 3rd Point (Zenith) if enabled
-        const apply3PT = (p, base) => {
-            if (modeSel.value === "2pt") return p;
-            const m = (state.vpZenith.y - base.y) / (state.vpZenith.x - base.x);
-            const targetY = p.y;
-            const targetX = base.x + (targetY - base.y) / m;
-            return { x: targetX, y: targetY };
-        };
-
-        const tMid = apply3PT(tMidRaw, bMid);
-        const tL = apply3PT(tLRaw, bL);
-        const tR = apply3PT(tRRaw, bR);
-        const tBack = apply3PT(tBackRaw, bBack);
-
-        const drawFace = (p1, p2, p3, p4, col) => {
-            ctx.fillStyle = col;
+        const drawFace = (p1, p2, p3, p4, wallAngleOffset) => {
+            const diff = Math.cos(rotRad + wallAngleOffset - sunAngleRad);
+            ctx.fillStyle = diff > 0 ? "#e0e0e0" : "#606060"; 
             ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
             ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.closePath();
-            ctx.fill(); ctx.strokeStyle = "#333"; ctx.lineWidth = isSel ? 2 : 1; ctx.stroke();
+            ctx.fill(); ctx.strokeStyle = "#333"; ctx.lineWidth = isSel ? 3 : 1; ctx.stroke();
         };
 
-        // Render logic
-        drawFace(bL, bBack, tBack, tL, "#606060"); 
-        drawFace(bR, bBack, tBack, tR, "#606060"); 
-        drawFace(bMid, bL, tL, tMid, "#e0e0e0"); 
-        drawFace(bMid, bR, tR, tMid, "#e0e0e0"); 
+        drawFace(bL, bBack, tBack, tL, -Math.PI/2); 
+        drawFace(bR, bBack, tBack, tR, 0);          
+        drawFace(bMid, bL, tL, tMid, Math.PI);      
+        drawFace(bMid, bR, tR, tMid, Math.PI/2);    
 
-        // Roof Peak
-        const tPeakRaw = { x: (tL.x + tR.x)/2, y: (tL.y + tR.y)/2 - h.h*0.5 };
-        const tPeak = apply3PT(tPeakRaw, {x: (bL.x + bR.x)/2, y: (bL.y + bR.y)/2});
-        
-        ctx.fillStyle = "#f5f5f5";
-        ctx.beginPath();
-        ctx.moveTo(tL.x, tL.y); ctx.lineTo(tPeak.x, tPeak.y); ctx.lineTo(tMid.x, tMid.y);
+        // Wireframe Roof
+        const tPeak = { x: (tL.x + tR.x)/2, y: (tL.y + tR.y)/2 - h.h*0.6 };
+        ctx.fillStyle = "rgba(240,240,240,0.5)";
+        ctx.beginPath(); ctx.moveTo(tL.x, tL.y); ctx.lineTo(tPeak.x, tPeak.y); ctx.lineTo(tMid.x, tMid.y);
         ctx.lineTo(tR.x, tR.y); ctx.lineTo(tBack.x, tBack.y); ctx.lineTo(tPeak.x, tPeak.y);
         ctx.closePath(); ctx.fill(); ctx.stroke();
 
@@ -205,11 +181,10 @@ function draw(clean = false) {
         }
     });
 
-    // Drawing the VPs (If on screen)
     if(!clean) {
         ctx.fillStyle = "#ff4757";
         [state.vpL, state.vpR].forEach(v => {
-            if(v.x > 0 && v.x < width) { ctx.beginPath(); ctx.arc(v.x, v.y, 8, 0, 7); ctx.fill(); }
+            if(v.x > 0 && v.x < width) { ctx.beginPath(); ctx.arc(v.x, v.y, 10, 0, 7); ctx.fill(); }
         });
     }
 }

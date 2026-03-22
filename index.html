@@ -3,43 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Artist Perspective Tool - 360 Rotation & Sun</title>
+    <title>Artist Perspective Tool - Wireframe 360</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #f0f2f5; font-family: sans-serif; }
         canvas { display: block; background: white; cursor: crosshair; }
         .ui { position: absolute; top: 20px; left: 20px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; width: 250px; }
         .panel { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); pointer-events: all; }
-        h1 { font-size: 16px; margin: 0 0 10px 0; color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        h1 { font-size: 16px; margin: 0 0 10px 0; border-bottom: 1px solid #eee; padding-bottom: 5px; }
         label { display: block; font-size: 11px; font-weight: bold; margin: 8px 0 3px; color: #666; text-transform: uppercase; }
         input[type="range"] { width: 100%; cursor: pointer; }
-        button { width: 100%; padding: 10px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; margin-top: 8px; transition: 0.2s; }
+        button { width: 100%; padding: 10px; cursor: pointer; border: none; border-radius: 4px; font-weight: bold; margin-top: 8px; }
         #addBtn { background: #2ed573; color: white; }
-        #downloadBtn { background: #3498db; color: white; }
-        #deleteBtn { background: #ff4757; color: white; opacity: 0.2; cursor: not-allowed; }
-        #deleteBtn.active { opacity: 1; cursor: pointer; }
-        .status { font-size: 11px; color: #888; text-align: center; margin-top: 8px; font-style: italic; }
+        #dlBtn { background: #3498db; color: white; }
+        #delBtn { background: #ff4757; color: white; opacity: 0.3; }
+        #delBtn.active { opacity: 1; }
+        .status { font-size: 11px; color: #888; text-align: center; margin-top: 8px; }
     </style>
 </head>
 <body>
 
 <div class="ui">
     <div class="panel">
-        <h1>Global Settings</h1>
+        <h1>Global</h1>
         <label>Sun Position</label>
         <input type="range" id="sunSld" min="0" max="1200" value="600">
         <button id="addBtn">Add Cottage</button>
-        <button id="downloadBtn">Download Sketch</button>
+        <button id="dlBtn">Download Sketch</button>
     </div>
-    
     <div class="panel">
         <h1>Cottage Settings</h1>
-        <p id="status" class="status">Select a green anchor</p>
         <label>Size & Height</label>
         <input type="range" id="sizeSld" min="20" max="300" value="80">
         <input type="range" id="heightSld" min="10" max="200" value="60">
-        <label>Full Rotation (360°)</label>
+        <label>Rotation (360°)</label>
         <input type="range" id="rotSld" min="0" max="360" value="45">
-        <button id="deleteBtn" disabled>Delete Selected</button>
+        <button id="delBtn" disabled>Delete Selected</button>
+        <p id="status" class="status">Select a green anchor</p>
     </div>
 </div>
 
@@ -49,8 +48,8 @@
 const canvas = document.getElementById('cvs'), ctx = canvas.getContext('2d');
 const sizeSld = document.getElementById('sizeSld'), heightSld = document.getElementById('heightSld');
 const rotSld = document.getElementById('rotSld'), sunSld = document.getElementById('sunSld');
-const addBtn = document.getElementById('addBtn'), deleteBtn = document.getElementById('deleteBtn');
-const downloadBtn = document.getElementById('downloadBtn'), statusText = document.getElementById('status');
+const addBtn = document.getElementById('addBtn'), delBtn = document.getElementById('delBtn');
+const dlBtn = document.getElementById('dlBtn'), statusTxt = document.getElementById('status');
 
 let width, height, activeObj = null, selectedHouse = null;
 const state = { vpL: { x: 150, y: 350, isVP: true }, vpR: { x: 1000, y: 350, isVP: true }, houses: [] };
@@ -66,21 +65,8 @@ function init() {
         state.houses.push(h); select(h); draw();
     };
 
-    deleteBtn.onclick = () => { 
-        if(selectedHouse) { 
-            state.houses = state.houses.filter(h => h !== selectedHouse); 
-            select(null); draw(); 
-        } 
-    };
-    
-    downloadBtn.onclick = () => { 
-        draw(true); 
-        const link = document.createElement('a'); 
-        link.download = 'watercolor-layout.png'; 
-        link.href = canvas.toDataURL(); 
-        link.click(); 
-        draw(false); 
-    };
+    delBtn.onclick = () => { if(selectedHouse) { state.houses = state.houses.filter(h => h !== selectedHouse); select(null); draw(); } };
+    dlBtn.onclick = () => { draw(true); const a = document.createElement('a'); a.download = 'sketch.png'; a.href = canvas.toDataURL(); a.click(); draw(false); };
 
     [sizeSld, heightSld, rotSld, sunSld].forEach(s => s.oninput = () => {
         if(selectedHouse) {
@@ -92,7 +78,7 @@ function init() {
     });
 
     resize();
-    state.houses.push({ x: width * 0.4, y: height * 0.7, size: 100, h: 70, rot: 35 });
+    state.houses.push({ x: width * 0.5, y: height * 0.7, size: 100, h: 70, rot: 35 });
     draw();
 }
 
@@ -100,11 +86,11 @@ function select(h) {
     selectedHouse = h;
     if(h) {
         sizeSld.value = h.size; heightSld.value = h.h; rotSld.value = h.rot;
-        deleteBtn.disabled = false; deleteBtn.classList.add('active');
-        statusText.innerText = "Cottage selected";
+        delBtn.disabled = false; delBtn.classList.add('active');
+        statusTxt.innerText = "Editing Selected";
     } else {
-        deleteBtn.disabled = true; deleteBtn.classList.remove('active');
-        statusText.innerText = "Select a green anchor";
+        delBtn.disabled = true; delBtn.classList.remove('active');
+        statusTxt.innerText = "Select a green anchor";
     }
 }
 
@@ -116,59 +102,71 @@ function resize() {
     draw();
 }
 
-// Perspective projection helper
-function getP(p, vp, tx) { 
-    if (Math.abs(vp.x - p.x) < 0.1) return { x: tx, y: p.y };
-    return { x: tx, y: p.y + (vp.y - p.y) / (vp.x - p.x) * (tx - p.x) }; 
-}
+// Perspective Math
+function getP(p, vp, tx) { return { x: tx, y: p.y + (vp.y - p.y) / (vp.x - p.x) * (tx - p.x) }; }
 
 function draw(clean = false) {
     ctx.clearRect(0, 0, width, height);
     ctx.strokeStyle = "#ddd";
-    ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, state.vpL.y); ctx.lineTo(width, state.vpR.y); ctx.stroke();
 
     const sunX = parseInt(sunSld.value);
-    if(!clean) { 
-        ctx.fillStyle = "#FFD700"; ctx.beginPath(); ctx.arc(sunX, state.vpL.y - 15, 12, 0, 7); ctx.fill(); 
-    }
+    if(!clean) { ctx.fillStyle = "#FFD700"; ctx.beginPath(); ctx.arc(sunX, state.vpL.y - 15, 10, 0, 7); ctx.fill(); }
 
     state.houses.forEach(h => {
         const isSel = (h === selectedHouse && !clean);
-        const bMid = { x: h.x, y: h.y }, tMid = { x: h.x, y: h.y - h.h };
+        const angle = (h.rot * Math.PI) / 180;
         
-        // Advanced 360 degree rotation logic
-        const rRad = (h.rot * Math.PI) / 180;
-        const wDist = h.size * Math.cos(rRad);
-        const dDist = h.size * Math.sin(rRad);
-
-        const bL = getP(bMid, state.vpL, h.x - wDist), tL = getP(tMid, state.vpL, h.x - wDist);
-        const bR = getP(bMid, state.vpR, h.x + dDist), tR = getP(tMid, state.vpR, h.x + dDist);
-
-        // Lighting calculation based on wall angle vs Sun
-        const leftLight = Math.max(0.1, Math.min(0.8, (sunX - (h.x - wDist/2)) / 300 + 0.3));
-        const rightLight = Math.max(0.1, Math.min(0.8, ((h.x + dDist/2) - sunX) / 300 + 0.3));
-
-        ctx.lineWidth = isSel ? 3 : 1.5;
+        // Calculate 4 Base Points (Bottom)
+        const bMid = { x: h.x, y: h.y };
+        const xL = h.x - h.size * Math.cos(angle);
+        const xR = h.x + h.size * Math.sin(angle);
         
-        // Draw Faces
-        ctx.fillStyle = `rgba(180, 180, 180, ${leftLight})`; 
-        ctx.beginPath(); ctx.moveTo(bMid.x, bMid.y); ctx.lineTo(bL.x, bL.y); ctx.lineTo(tL.x, tL.y); ctx.lineTo(tMid.x, tMid.y); ctx.fill();
-        ctx.strokeStyle = "#ff4757"; ctx.stroke();
+        const bL = getP(bMid, state.vpL, xL);
+        const bR = getP(bMid, state.vpR, xR);
+        // Back corner (Opposite of bMid)
+        const bBack = { x: bL.x + (bR.x - bMid.x), y: bL.y + (bR.y - bMid.y) };
 
-        ctx.fillStyle = `rgba(180, 180, 180, ${rightLight})`; 
-        ctx.beginPath(); ctx.moveTo(bMid.x, bMid.y); ctx.lineTo(bR.x, bR.y); ctx.lineTo(tR.x, tR.y); ctx.lineTo(tMid.x, tMid.y); ctx.fill();
-        ctx.strokeStyle = "#2ed573"; ctx.stroke();
+        // Calculate 4 Top Points (Height)
+        const tMid = { x: bMid.x, y: bMid.y - h.h };
+        const tL = { x: bL.x, y: bL.y - h.h };
+        const tR = { x: bR.x, y: bR.y - h.h };
+        const tBack = { x: bBack.x, y: bBack.y - h.h };
 
-        // Roof Gable
-        ctx.strokeStyle = "#333";
-        ctx.beginPath(); ctx.moveTo(tL.x, tL.y); 
-        ctx.lineTo(h.x - (wDist - dDist)*0.5, tL.y - h.h*0.4); // Dynamic peak
-        ctx.lineTo(tMid.x, tMid.y); ctx.stroke();
+        // Shading Logic
+        const shade = Math.max(0, Math.min(0.3, (sunX - h.x) / 500));
 
+        // Draw Wireframe Walls
+        ctx.lineWidth = isSel ? 3 : 1;
+        ctx.strokeStyle = "#444";
+        
+        const drawFace = (p1, p2, p3, p4, color) => {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+            ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+        };
+
+        // Render 4 Walls with light tones
+        ctx.globalAlpha = 0.4;
+        drawFace(bMid, bL, tL, tMid, `rgba(200,0,0,${0.2+shade})`); // Side 1
+        drawFace(bMid, bR, tR, tMid, `rgba(0,200,0,${0.2-shade})`); // Side 2
+        drawFace(bL, bBack, tBack, tL, "rgba(200,200,200,0.1)");    // Back 1
+        drawFace(bR, bBack, tBack, tR, "rgba(200,200,200,0.1)");    // Back 2
+
+        // Roof (Wireframe)
+        const tPeak = { x: (tL.x + tR.x)/2, y: tMid.y - h.h*0.5 };
+        ctx.beginPath();
+        ctx.moveTo(tL.x, tL.y); ctx.lineTo(tPeak.x, tPeak.y); ctx.lineTo(tMid.x, tMid.y);
+        ctx.lineTo(tR.x, tR.y); ctx.lineTo(tBack.x, tBack.y); ctx.lineTo(tPeak.x, tPeak.y);
+        ctx.stroke();
+
+        ctx.globalAlpha = 1.0;
         if(!clean) {
-            ctx.fillStyle = isSel ? "#2f3542" : "#2ed573";
-            ctx.beginPath(); ctx.arc(h.x, h.y, isSel ? 10 : 7, 0, 7); ctx.fill();
+            ctx.fillStyle = isSel ? "#333" : "#2ed573";
+            ctx.beginPath(); ctx.arc(h.x, h.y, 8, 0, 7); ctx.fill();
         }
     });
 
@@ -179,8 +177,7 @@ function draw(clean = false) {
 }
 
 function start(e) {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top; 
+    const r = canvas.getBoundingClientRect(), mx = e.clientX-r.left, my = e.clientY-r.top;
     activeObj = null;
     [state.vpL, state.vpR].forEach(v => { if(Math.hypot(v.x-mx, v.y-my) < 25) activeObj = v; });
     state.houses.forEach(h => { if(Math.hypot(h.x-mx, h.y-my) < 25) { activeObj = h; select(h); } });
@@ -190,8 +187,8 @@ function start(e) {
 
 function move(e) {
     if(!activeObj) return;
-    const rect = canvas.getBoundingClientRect();
-    activeObj.x = e.clientX - rect.left; activeObj.y = e.clientY - rect.top;
+    const r = canvas.getBoundingClientRect();
+    activeObj.x = e.clientX-r.left; activeObj.y = e.clientY-r.top;
     if(activeObj.isVP) state.vpL.y = state.vpR.y = activeObj.y;
     draw();
 }

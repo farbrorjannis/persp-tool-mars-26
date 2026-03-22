@@ -1,42 +1,22 @@
-body { 
-    margin: 0; 
-    overflow: hidden; 
-    background: #f8f9fa; 
-    font-family: 'Segoe UI', system-ui, sans-serif; 
+/* ... (behåll din tidigare CSS och lägg till detta) */
+
+button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    background: #2ed573;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    pointer-events: all;
 }
 
-canvas { 
-    display: block; 
-    background: #ffffff; 
-    cursor: crosshair; 
-}
+button:hover { background: #26af5a; }
 
-.ui-container {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    pointer-events: none; /* VIKTIGT: Gör att klick går igenom till canvasen */
-}
+h2 { font-size: 13px; color: #ff4757; margin: 0 0 10px 0; }
 
-.panel {
-    background: rgba(255, 255, 255, 0.9);
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    width: 240px;
-    pointer-events: all; /* Aktiverar klick för sliders/knappar */
-}
-
-h1 { margin: 0 0 8px 0; font-size: 16px; color: #222; }
-p { font-size: 12px; margin: 4px 0; color: #555; }
-
-.control { margin-top: 12px; }
-label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; }
-input[type="range"] { width: 100%; cursor: pointer; }
-
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
-.red { background: #ff4757; }
-.green { background: #2ed573; }
+/* Gör den valda stugans inställningar mer synliga */
+.settings { border-left: 4px solid #ccc; transition: border-color 0.3s; }
+.settings.active { border-left-color: #2ed573; }
